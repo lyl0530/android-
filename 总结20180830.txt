@@ -1,0 +1,281 @@
+Activity
+生命周期 - launchermode - intent Bundle - Parcelable 和Serializable
+
+1 Activity的生命周期  
+
+onCreate
+onStart --- onRestart
+onResume	    |	
+                    |
+onPause             |
+onStop  -- ----- ---
+onDestroy
+
+B全部遮挡A【A不可见，但未销毁】
+onPause（A）- onCreate-onStart-onResume（B）- onStop（A）
+B back
+onPause（B）- onRestart-onStart-onResume（A）- onStop-onDestroy（B）
+
+B部分遮挡A【A可见，并未stop】
+onPause（A）- onCreate-onStart-onResume（B）
+B back
+onPause（B）- onResume（A）-  onStop-onDestroy（B）
+
+
+2.launchermode
+
+普通模式：每次都会创建一个Activity
+栈顶复用模式：当活动处于栈顶时复用，其余都要重新创建
+栈内复用模式：栈内有时，都复用，其上有Activity则都出栈
+单例模式：会新创建一个任务栈，来管理该活动。可以用于和其他应用共享该活动的实例。
+
+
+使用intent启动Activity：onNewIntent：活动已经启动过，且活动处于任务栈中
+为栈顶复用模式时，若活动在栈顶时，要再次启动该活动时，会调用onNewIntent方法。此时要调用setIntent方法设置intent，再获取intent。
+栈内复用、单例模式时，活动再次别启动时，会调用onNewIntent方法。此时要调用setIntent方法设置intent，再获取intent。
+普通模式时，每次启动该活动时，都会创建新的实例，即走onCreate方法
+
+所有启动模式下，若活动在后台被杀死，则启动该活动时，要走onCreate方法。此时直接使用getIntent方法
+
+ActivityA 启动ActivityB是，ActivityB有可能被系统回收。
+1.若何获取ActivityA传过来的intent：被系统回收、没有被回收 -- 四种启动模式下
+2.ActivityB若被系统回收，回收时，要怎要保存当前状态，并如何复原？
+在系统回收Activity之前，会调用onInstanceSave方法，可把当前状态保存在Bundle类型的参数中。
+当Activity再次被创建时会调用onCreate方法，从其Bundle类型的参数中获取回收前的状态值。
+
+
+3. 后台的Activity被系统回收怎么办？如果后台的Activity由于某原因被系统回收可了，如何在被系统回收之前保存当前状态？
+   除了在栈顶的activity,其他的activity都有可能在内存不足的时候被系统回收,一个activity越处于栈底,被回收的可能性越大.
+
+protected void onSaveInstanceState(Bundle outState) {
+    super.onSaveInstanceState(outState);
+    outState.putLong("id",1234567890);
+}
+
+public void onCreate(Bundle savedInstanceState) {
+  	//判断savedInstanceState是不是空.
+	//如果不为空就取出来
+        super.onCreate(savedInstanceState);
+}
+
+
+4. intent隐式意图、显示意图  Bundle  
+Intent传递，Bundle存储  //Intent的底层是通过Bundle对象的形式存储
+
+
+5. 序列化Parcelable 和Serializable
+
+Serializable Parcelable 都可实现序列化，并用于Intent间传递数据。
+
+Serializable是java的序列化接口，使用简单但开销大，序列化和反序列化过程需大量I/O操作。
+Parcelable是Android的序列化方式，因此更适用于Android平台。使用相对前者麻烦，但效率高。在Android平台上，首选这种序列化方式。
+Parcelable主要用于内存序列化上，若通过Parcelable将对象序列化到存储设备　或　将对象序列化后通过网络传输，则过程过于复杂，建议使用Serializable。
+
+
+------------------------------
+
+
+1. 绑定解绑时机
+Activity的整个生命周期都要服务，则在onCreate-onDestroy中绑定、解绑
+service运行在Activity可见的状态下，则在onResume-onPause中绑定、解绑
+
+绑定后，只有解绑，才会调用service的onDestroy方法
+启动后，只有stopService-stopSelf，才会调用service的onDestroy方法
+
+
+2. 请介绍下Service，特点是？什么时候使用Service？
+服务是后台计算型组件，有两种使用方式：启动服务和绑定服务；对应着停止服务和解绑服务。
+启动服务和绑定服务可同时存在，不冲突。
+前者主要用于后台计算，不需和外界有直接的交互。因为Service运行在主线程中，此时若执行耗时任务，要在单独的线程中完成。
+后者主要用于其他组件和Service组件通信。
+
+
+3. Service的生命周期
+启动服务startService	绑定服务bindService
+onCreate		onCreate
+onStartCommand		onBind
+
+			onUnbind
+onDestroy		onDestroy
+
+
+4. AIDL中各个方法所处的线程 【主线程、Binder线程池 - 代理模式 - intentService - 内置apk - messenger - 进程间通信】
+
+Service：onCreate onBind Binder mBinder = new IMyInterface.Stub(){};
+Activity：onCreate bindService ServiceConnection serviceConnected
+
+除了被调用的服务端的方法运行在Binder线程池中，其余方法都运行在主线程中
+ServiceConnection方法中不要做耗时操作。
+客户端调用了服务端的远程方法后，客户端会被挂起，直到服务端远程方法返回。
+若远程方法耗时，会导致客户端线程阻塞，若是主线程，则会导致ANR。客户端不要调用耗时的远程方法。
+
+
+5. 代理模式：静态动态代理  //((Cloth)(new H().blink(new YaGer()))).productCloth();
+    interface Cloth{
+        void productCloth();
+    }
+
+    class YaGer implements Cloth{
+        @Override
+        public void productCloth() {
+            Log.e("lllas", "dsfa");
+        }
+    }
+
+    class H implements InvocationHandler{
+        Object obj;
+        Object blink(Object obj){
+            this.obj = obj;
+            return Proxy.newProxyInstance(obj.getClass().getClassLoader(), obj.getClass().getInterfaces(), this);
+        }
+
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            return method.invoke(obj, args);
+        }
+    }
+
+
+6. intentService：
+   针对于startService来说
+   普通的service ,默认运行在主线程，若执行耗时操作，会产生ANR。此时要记得在子线程中执行耗时操作。执行完后要记得停止服务。
+
+   intentService内部会开启一个子线程，执行耗时操作，执行完毕后，会自动停止。
+   要有无参构造，且重写onHandleIntent方法，处理具体逻辑。
+
+
+7. 内置apk：有源码、无源码【是否修改到分支】
+
+
+8. messenger：底层实现是AIDL，支持低并发的一对多串行的实时通信
+   Messenger在不同进程间传递message对象，一次只能处理一个请求，不存在并发情况，不用考虑线程同步问题
+   Messenger只能传输Bundle支持的数据类型，不支持远程过程调用（RPC）
+   若同时需处理大量消息，且要远程调用服务端的方法时，要使用AIDL
+
+
+9. 进程间通信
+   Bundle、文件共享、Messenger、AIDL、ContentProvider、Socket
+
+   Bundle：用于组件间的进程间通信
+   文件共享：适用于无并发，不需即时通信的情形
+
+   Messenger、AIDL、ContentProvider都是基于Binder的。
+   AIDL：适用于一对多且有RPC调用的场景
+   Messenger：低并发串行的实时通信
+   ContentProvider：一对多的进程间数据共享
+ 
+   Socket：网络数据交换
+
+   产生的问题：
+   Application：多进程模式中，同一进程的组件拥有相同的虚拟机、Application，不同的进程，其虚拟机、Application、内存空间不同。
+   单例、静态变量：因为不同进程拥有不同的内存空间，故单例、静态变量都会失效。不同的进程会有多份实例，修改静态变量对另一个进程无效。
+   SharedPreference：底层是对XML文件的读写，没有实现并发修改机制，不支持两个进程同时去读写文件，不能保证数据的准确、安全。
+   线程同步机制完全失效：因为空间独立，锁对象或锁全局类，都无法保证线程同步，因为进程不同，锁住的对象不是同一个。
+
+
+10. 单例模式
+
+public class MySingleton {
+    /*
+        instance = new MySingleton();
+        这句不是原子操作，会执行以下三步：
+        1.申请空间
+        2.初始化该空间
+        3.使instance指向这片内存区域 //3执行完后，则就认为实例对象部位null
+      　java即时编译器中，存在指令重排序优化，可能顺序为123,或者132
+      　若是132：当执行完3后此时认为实例对象已经不为null，但还未初始化。
+      　若此时释放了同步锁，被别的线程抢占了，获取该实例对象后直接使用，就回报错。
+    */
+    private static volatile MySingleton instance;
+
+    private MySingleton(){}
+
+    public static MySingleton getInstance(){
+        //每次获取实例时，都会获取同步锁，而产生多余的开销。为避免产生不必要的开销，而进行外层if判断
+        if (null == instance) {
+            //线程1得到同步锁后，去创建对象，别的线程无法得到线程锁，直到线程1new出对象，释放同步锁
+            //此时别的线程得到同步锁后，if条件不成立，直接得到已经创建好的对象
+            synchronized (MySingleton.class) {
+                if (null == instance) {
+                    instance = new MySingleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+
+
+11. 进程 - 线程
+
+进程一般指一个执行单元，每个进程都有自己独立的内存空间和资源，不同进程间的资源不能任意访问。
+系统给每个进程分配的空间也是有限的。
+
+线程是CPU调度的基本单位，进程内可以有多个线程，若只有一个线程，则该线程就是主线程。
+系统中的线程过多时，会通过时间片轮转的方式调度每个线程。只有线程数小于CPU核心数时，线程才可以并行执行。
+线程是一种受限的系统资源，不能无限制的产生。且线程的创建和销毁都会产生一定的开销，为避免这种情况，要使用线程池来缓存一定数量的线程。
+
+
+
+------------------------------
+
+
+
+1. fragment的生命周期  FramentLayout - Content[setContentView] - 
+
+onAttach：Activity和Fragment绑定完成，此时可以执行诸如mActivity = activity的操作
+onCreate：创建对象，可通过参数savedInstanceState获取之前保存的值
+onCreateView：创建视图，加载布局
+onActivityCreate：对应的Activity创建完成，在该方法内可进行与Activity交互的UI操作
+onStart：Fragment处于可见状态
+onResume：Fragment处于活动状态
+
+onPause：Fragment处于暂停状态
+onStop：Fragment处于不可见状态
+onDestroyView：销毁视图，但未与Activity解除绑定
+onDestroy：销毁fragment
+onDetach：解除与Activity的绑定
+
+
+2. android中Fragment和Activity的区别
+
+Fragment不能单独存在，必须嵌入在一个Activity中。同时一个Activity可以运行多个Fragment。
+Activity有任务栈，Fragment有后退栈（Back Stack）。Activity的任务栈由系统管理，而Fragment的后退栈由所在的Activity管理。
+Fragment是Object的子类，而Activity是Context的子类。
+
+3. Content
+Android会自动在布局文件的最外层再嵌套一个FrameLayout，这个布局的id叫作content，
+
+
+------------------------------
+
+
+1. 消息机制
+
+2. 事件
+
+3. 动画
+
+4. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                        
