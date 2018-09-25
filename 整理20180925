@@ -186,7 +186,7 @@ StringBuffer的方法是同步的，线程安全的。
 StringBuilder不是线程安全的，但效率比StringBuffer高。
 
 4.
-Java集合类框架
+Java集合类框架//扩容->底层采用数组存储；同步必然影响性能
 
 collection map
 list set
@@ -269,7 +269,7 @@ put和get都首先会调用hashcode方法，去查找相关的key若不重写has
 	引用计数算法中，每个计数器只是记录了对应对象的局部信息，而没有一份全局的对象图的生死信息。
 
    可达性算法：有全局的对象图信息，从对象图的根扫描，批量识别对象的生死状态，然后批量释放死亡对象。
-
+mygithubcode0*#
 
 
 
