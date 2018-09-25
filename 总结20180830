@@ -58,7 +58,6 @@ public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 }
 
-
 4. intent隐式意图、显示意图  Bundle  
 Intent传递，Bundle存储  //Intent的底层是通过Bundle对象的形式存储
 
@@ -84,7 +83,7 @@ service运行在Activity可见的状态下，则在onResume-onPause中绑定、�
 
 
 2. 请介绍下Service，特点是？什么时候使用Service？
-服务是后台计算型组件，有两种使用方式：启动服务和绑定服务；对应着停止服务和解绑服务。
+service是计算型组件，用于在后天执行一系列计算任务。有两种使用方式：启动服务和绑定服务；对应着停止服务和解绑服务。
 启动服务和绑定服务可同时存在，不冲突。
 前者主要用于后台计算，不需和外界有直接的交互。因为Service运行在主线程中，此时若执行耗时任务，要在单独的线程中完成。
 后者主要用于其他组件和Service组件通信。
@@ -102,7 +101,7 @@ onDestroy		onDestroy
 4. AIDL中各个方法所处的线程 【主线程、Binder线程池 - 代理模式 - intentService - 内置apk - messenger - 进程间通信】
 
 Service：onCreate onBind Binder mBinder = new IMyInterface.Stub(){};
-Activity：onCreate bindService ServiceConnection serviceConnected
+Activity：onCreate bindService ServiceConnection onServiceConnected
 
 除了被调用的服务端的方法运行在Binder线程池中，其余方法都运行在主线程中
 ServiceConnection方法中不要做耗时操作。
@@ -141,13 +140,13 @@ ServiceConnection方法中不要做耗时操作。
    普通的service ,默认运行在主线程，若执行耗时操作，会产生ANR。此时要记得在子线程中执行耗时操作。执行完后要记得停止服务。
 
    intentService内部会开启一个子线程，执行耗时操作，执行完毕后，会自动停止。
-   要有无参构造，且重写onHandleIntent方法，处理具体逻辑。
+   要调用父类的有参构造，且重写onHandleIntent方法，处理具体逻辑。
 
 
 7. 内置apk：有源码、无源码【是否修改到分支】
 
 
-8. messenger：底层实现是AIDL，支持低并发的一对多串行的实时通信
+8. messenger：底层实现是AIDL，支持低并发的一对多串行的实时通信 // 线程间通信：HandlerThread
    Messenger在不同进程间传递message对象，一次只能处理一个请求，不存在并发情况，不用考虑线程同步问题
    Messenger只能传输Bundle支持的数据类型，不支持远程过程调用（RPC）
    若同时需处理大量消息，且要远程调用服务端的方法时，要使用AIDL
@@ -156,7 +155,9 @@ ServiceConnection方法中不要做耗时操作。
 9. 进程间通信
    Bundle、文件共享、Messenger、AIDL、ContentProvider、Socket
 
-   Bundle：用于组件间的进程间通信
+   Bundle：用于组件间的进程间通信//组件之间//Activity、Service、BroadcaseReceiver间都是通过Intent传值，进行进程间通信的。而的底层是通过Bundle对象的形式来存储的。
+				 //广播事件机制是进程间通信的手段，远程服务也是实现进程通信的手段[aidl技术]。
+
    文件共享：适用于无并发，不需即时通信的情形
 
    Messenger、AIDL、ContentProvider都是基于Binder的。
@@ -220,7 +221,6 @@ public class MySingleton {
 ------------------------------
 
 
-
 1. fragment的生命周期  FramentLayout - Content[setContentView] - 
 
 onAttach：Activity和Fragment绑定完成，此时可以执行诸如mActivity = activity的操作
@@ -249,33 +249,407 @@ Android会自动在布局文件的最外层再嵌套一个FrameLayout，这个�
 
 ------------------------------
 
+1. 广播 
 
-1. 消息机制
+静态注册是指在清单文件中注册，在应用安装成功或开机时，不需应用启动，就可接收广播。
+注册时不会创建对象，接收到广播时，才会创建对象
+多次接收该广播，每次都会创建一个新的广播接收器对象，处理完广播，即对象执行完onReceive方法后，就会变成垃圾对象而被回收，生命周期较短。下次再接收到该广播后，会再次创建一个对象。 
 
-2. 事件
+动态注册是指使用registerReceiver、unregisterReceiver方法注册、解注册。
+应用启动，注册广播，此时创建广播接收器对象。直到解注册，变为垃圾对象而被回收
+多次接收该广播，每次都是该对象处理广播
 
-3. 动画
+1）注册方式
+	在清单文件中注册
+	通过registerReceiver方法注册			
 
-4. 
+2）注册时间
+	应用安装成功或开机：注册时不会创建对象，接收到广播时，才会创建对象
+	执行registerReceiver方法时注册：注册就创建对象
+
+3）生命结束的时间
+	应用卸载：对象执行完onReceive方法后就回收了
+	unregisterReceiver方法执行时：Activity退出，要解注册，此时对象会被回收
+	
+4）应用场景
+	需要监听的时间为应用的整个生命过程
+	只服务于某个Activity/Service
+
+onReceive方法运行在主线程，不要执行耗时操作
+
+静态注册，注册的是类，每次接收到广播后要先创建对象，才能接收广播。
+动态注册，注册的是BroadcastReceiver对象；故动态注册对应的广播接收器先接收到广播。
+
+android.intent.action.SCREEN_ON与android.intent.action.SCREEN_OFF不可以使用静态注册（没有效果），必须使用动态注册的方式。
+可能是由于android的内部管理机制导致，不希望程序在未运行时还保持对屏幕的监视。
+
+
+广播只是一种传输数据的载体：同样使用到Intent-action，广播也是一种进程间通信的方式。
+只是用于打开其他组件，不能在onReceive()方法中执行耗时操作，也不可开启线程执行耗时操作。可开启服务。
+因为onReceive()方法在主线程中执行，耗时操作会导致ANR。
+同时，若开启子线程，因为广播接收器对象的生命周期很短，其对象销毁后，就变成了空进程，容易被系统回收。此时开启的子线程会被中断执行。
+
+全局广播：一般广播、有序广播
+本地广播：使用LocalBroadcastManager管理，LocalBroadcastManager.sendBroadcast()/registerReceiver()/unregisterReceiver()
+	  只能在应用程序内部使用，不存在安全问题。
+
+
+
+
+java 
 
 
 
 
 
 
+Final能修饰什么？
+1 修饰类，则为终态类，不可被继承，类的实现细节不可被改变
+2 修饰方法，可被子类继承，但不可被子类的方法覆盖
+3 修改变量：被final修饰的变量在构建对象之前初始化，可在定义处、代码块中、构造器中赋初值
+	若修饰基本类型变量，具有只读属性，其值不可变。
+	若修饰类类型变量，则其指向不可变，指向内存的值可变。
+
+-------
+
+static
+
+静态内部类：代码测试，将主方法写入到静态内部类中
+
+1 修饰方法：静态方法内不可调用普通方法、普通成员，因为静态方法在类加载时调用，此时还没有产生对象，而普通方法、普通成员要依赖于对象，此时还调用不到。
+2 修饰成员：仅在类被加载时被初始化。局部变量不可使用static，局部变量的作用域在该方法内，而 static修饰的变量，作用域为整个类，二者冲突。
+3 修饰代码块：仅在类被加载时被初始化，按照顺序，依次初始化。
+
+构建对象：先加载类，再使用构造器构造对象，先加载父类在加载子类，先构造父类再构造子类	
+
+
+-------
+
+Java中try catch finally的执行顺序
+先执行try中代码发生异常执行catch中代码，最后一定会执行finally中代码
+
+-------
+
+静态内部类、内部类、匿名内部类，为什么内部类会持有外部类的引用？持有的引用是this，还是其它？
+静态内部类：使用static修饰的内部类
+内部类：就是在某个类的内部又定义了一个类，内部类所嵌入的类称为外部类
+匿名内部类：使用new生成的内部类
+因为内部类的产生依赖于外部类，持有的引用是类名.this
+
+-------
+
+ArrayList和Vector的主要区别是什么？
+
+//list关注索引，单个出现//List中的元素有序、允许有重复的元素
+//ArrayList和Vector都实现了List接口，都是以类似数组的形式存储在内存中
+
+Vector的方法都是同步的(Synchronized),是线程安全的(thread-safe)，而ArrayList的方法不是。
+由于线程的同步必然要影响性能，如果不考虑线程安全因素，一般用arraylist效率比较高，这样可以避免由于同步带来的不必要的性能开销。
+
+当Vector或ArrayList中的元素超过它的初始大小时,Vector会将它的容量翻倍,而ArrayList只增加50%的大小，这样,ArrayList就有利于节约内存空间。
+若在集合中使用数据量比较大的数据，用vector有一定的优势。
+
+
+// Hashtable & HashMap : Hashtable和HashMap它们的性能方面的比较类似 Vector和ArrayList，比如Hashtable的方法是同步的,而HashMap的不是。
+
+-------
+
+面向对象三大特性
+继承、封装、多态
+
+继承：一个类可以复用另一个类的方法、成员，除了私有成员、私有方法。java中的继承是单继承，即一个类只有一个父类。
+	子类可重写父类的方法，此时子类方法的返回值类型、方法名、参数列表和父类同
+	//重载：在同一个类中方法名相同参数表不同，和返回值无关。	
+	先加载父类，再加载子类；先初始化父类再初始化子类
+
+封装：将类的某些信息隐藏在类内部，不允许外部程序直接访问，而是通过该类提供的方法来实现对隐藏信息的操作和访问。//比如使用get set方法
+ 	好处：只能通过规定的方法访问数据。隐藏类的实例细节，方便修改和实现。　
+	内部类的方法可以直接访问外部类的所有数据，包括私有的数据。
+
+多态：父类引用指向子类对象
+	属性：编译运行时，都看左边。在使用多态时，子类的属性不会覆盖父类的同名属性，此时是调用的父类的属性值。
+	方法：编译时看左边；运行时看右边。
+	静态成员和静态方法：无论编译和运行，都看左边。
+	使用到了继承，故可复用父类代码。子类可自由扩展自己的代码。
+
+
+-------
+
+java集合类框架的基本接口有哪些？
+
+
+List元素有序，可重复的集合。关注的是索引：单个出现  -- Vector ArrayList Linkedlist //
+public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable, java.io.Serializable {}
+
+Set元素无序，不可重复的集合。关注的是唯一性：单个出现 -- Hashset
+Map具有映射关系的集合。关注的是键值映射：是成对出现  -- HashMap HashTable //ConcurrentHashMap
+
+public interface ConcurrentMap<K,V> extends Map<K,V> {}
+public class ConcurrentHashMap<K,V> extends AbstractMap<K,V> implements ConcurrentMap<K,V>, Serializable {}
+
+
+Collection：代表一组对象，每一个对象都是它的子元素
+Set：不包括重复元素的Collection
+List：有顺序的Collection，并且可以包含重复元素
+Map：可以把键（key）映射到值（value）的对象，键不能重复
+
+
+1. 总共有两大接口：Collection和Map，一个是元素集合，一个是键值对集合。
+List接口、Set接口都是继承自Collection接口，一个是有序元素集合，一个是无序元素集合
+
+2. ArrayList类和LinkList类实现了List接口。ArrayList底层采用数组存储，因此适合查询，不适合增删
+	LinkList底层采用双向链表，适合增删，不适合查询
+
+3. HashMap和HashTable实现了Map，其中HashTable是线程安全的，但是HashMap性能更好
+
+
+1）extends和implement
+一个接口可以继承多个接口.
+interface C extends A, B {}是可以的.
+
+public interface Collection<E> extends Iterable<E> {}
+public interface List<E> extends Collection<E> {}
+public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAccess, Cloneable, java.io.Serializable
+
+
+一个类可以实现多个接口:
+class D implements A,B,C{}
+
+但是一个类只能继承一个类,不能继承多个类
+class B extends A{}
+
+在继承类的同时,也可以继承接口:
+class E extends D implements A,B,C{}
+这也正是选择用接口而不是抽象类的原因 
+
+
+
+2）抽象类和接口的区别
+（1）语法层面上的区别
+　1.一个类只能继承一个抽象类，而一个类却可以实现多个接口。
+　2.抽象类中的成员变量可以是各种类型的，而接口中的成员变量只能是public static final类型的；且必须给其初值，所以实现类中不能重新定义，也不能改变其值；抽象类中的变量默认是 friendly 型，其值可以在子类中
+重新定义，也可以重新赋值。
+　3.抽象类中可以有非抽象方法，接口中则不能有非抽象方法。
+　4.接口可以省略abstract 关键字，抽象类不能。
+　5.接口中不能含有静态代码块以及静态方法，而抽象类可以有静态代码块和静态方法；
+
+（2）设计层面上的区别
+　　1）抽象类是对一种事物的抽象，即对类抽象，而接口是对行为的抽象
+    2）设计层面不同，抽象类作为很多子类的父类，它是一种模板式设计。
+-------
+
+Java中有内存泄露吗？（先说本质，再结合handler+匿名内部类）当时如何分析的？
+
+长生命周期的对象持有短生命周期对象的引用就很可能发生内存泄露，尽管短生命周期对象已经不再需要，但是因为长生命周期对象持有它的引用而导致不能被回收，这就是java中内存泄露的发生场景。
+
+1、静态集合类引起内存泄露： 
+像HashMap、Vector等的使用最容易出现内存泄露，这些静态变量的生命周期和应用程序一致，他们所引用的所有的对象Object也不能被释放，因为他们也将一直被Vector等引用着。 
+例: 
+Static Vector v = new Vector(10); 
+for (int i = 1; i<100; i++) 
+{ 
+Object o = new Object(); 
+v.add(o); 
+o = null; 
+}// 
+在这个例子中，循环申请Object 对象，并将所申请的对象放入一个Vector 中，如果仅仅释放引用本身（o=null），那么Vector 仍然引用该对象，所以这个对象对GC 来说是不可回收的。因此，如果对象加入到Vector 后，还必
+须从Vector 中删除，最简单的方法就是将Vector对象设置为null。
+
+2、
+当一个对象被存储进HashSet集合中以后，就不能修改这个对象中的那些参与计算哈希值的字段了，否则，对象修改后的哈希值与最初存储进HashSet集合中时的哈希值就不同了，在这种情况下，即使在contains方法使用该对象
+的当前引用作为的参数去HashSet集合中检索对象，也将返回找不到对象的结果，这也会导致无法从HashSet集合中单独删除当前对象，造成内存泄露。
+
+当集合里面的对象属性被修改后，再调用remove（）方法时不起作用。//此时重写了hashcode方法
+例： 
+public static void main(String[] args) 
+{ 
+Set<Person> set = new HashSet<Person>(); 
+Person p1 = new Person("唐僧","pwd1",25); 
+Person p2 = new Person("孙悟空","pwd2",26); 
+Person p3 = new Person("猪八戒","pwd3",27); 
+set.add(p1); 
+set.add(p2); 
+set.add(p3); 
+System.out.println("总共有:"+set.size()+" 个元素!"); //结果：总共有:3 个元素! 
+p3.setAge(2); //修改p3的年龄,此时p3元素对应的hashcode值发生改变 
+
+set.remove(p3); //此时remove不掉，造成内存泄漏
+set.add(p3); //重新添加，居然添加成功 
+System.out.println("总共有:"+set.size()+" 个元素!"); //结果：总共有:4 个元素! 
+for (Person person : set) 
+{ 
+System.out.println(person); 
+} 
+}
+3、监听器 
+在java 编程中，我们都需要和监听器打交道，通常一个应用当中会用到很多监听器，我们会调用一个控件的诸如addXXXListener()等方法来增加监听器，但往往在释放对象的时候却没有记住去删除这些监听器，从而增加了内存
+泄漏的机会。
+
+4、各种连接 
+比如数据库连接（dataSourse.getConnection()），网络连接(socket)和io连接，除非其显式的调用了其close（）方法将其连接关闭，否则是不会自动被GC 回收的。对于Resultset 和Statement 对象可以不进行显式回收，但
+Connection 一定要显式回收，因为Connection 在任何时候都无法自动回收，而Connection一旦回收，Resultset 和Statement 对象就会立即为NULL。但是如果使用连接池，情况就不一样了，除了要显式地关闭连接，还必须显
+式地关闭Resultset Statement 对象（关闭其中一个，另外一个也会关闭），否则就会造成大量的Statement 对象无法释放，从而引起内存泄漏。这种情况下一般都会在try里面去的连接，在finally里面释放连接。
+
+5、内部类和外部模块等的引用 
+内部类的引用是比较容易遗忘的一种，而且一旦没释放可能导致一系列的后继类对象没有释放。此外程序员还要小心外部模块不经意的引用，例如程序员A 负责A 模块，调用了B 模块的一个方法如： 
+public void registerMsg(Object b); 
+这种调用就要非常小心了，传入了一个对象，很可能模块B就保持了对该对象的引用，这时候就需要注意模块B 是否提供相应的操作去除引用。
+
+6、单例模式 
+不正确使用单例模式是引起内存泄露的一个常见问题，单例对象在被初始化后将在JVM的整个生命周期中存在（以静态变量的方式），
+如果单例对象持有外部对象的引用，那么这个外部对象将不能被jvm正常回收，导致内存泄露，考虑下面的例子： 
+class A{ 
+public A(){ 
+B.getInstance().setA(this); 
+} 
+.... 
+} 
+//B类采用单例模式 
+class B{ 
+private A a; 
+private static B instance=new B(); 
+public B(){} 
+public static B getInstance(){ 
+return instance; 
+} 
+public void setA(A a){ 
+this.a=a; 
+} 
+//getter... 
+} 
+显然B采用singleton模式，它持有一个A对象的引用，而这个A类的对象将不能被回收。想象下如果A是个比较复杂的对象或者集合类型会发生什么情况
+
+
+-------
+
+switch是否能作用在byte上，是否能作用在long上，是否能作用在String上？
+switch支持使用byte类型，不支持long类型，String支持在java1.7引入
+
+-------
+
+Java线程池，线程同步
+
+-------
+
+Java的垃圾回收机制（Garbage Collection,垃圾收集,垃圾回收），引用计数法两个对象互相引用如何解决？ -- 可达性算法
+判断GC引用计数法 -- 循环引用会发生什么情况
+
+
+
+给对象添加一个引用计数器，当有引用指向这个对象时，计数器加1，当指向该对象的引用失效时，计数器减1。
+如果该对象的计算器为0时，java垃圾回收器会认为该对象是可回收的。
+
+但是主流的java虚拟机没有采用引用计数算法，其中最主要的原因就是它很难解决对象之间互相循环引用的问题。
+若对象a的成员指向对象b,对象b的成员指向a,则构成了循环引用.
+
+每个计数器只记录了其对应对象的局部信息——被引用的次数，而没有（也不需要）一份全局的对象图的生死信息。
+
+由于只维护局部信息，所以不需要扫描全局对象图就可以识别并释放死对象；
+但也因为缺乏全局对象图信息，所以无法处理循环引用的状况
+
+
+更普遍的是使用可达性算法:
+需要全局的对象图信息，从对象图的“根”（也就是必然活的引用）出发扫描出去，基于引用的可到达性来判断对象的生死。
+这使得对象的生死状态只能批量的被识别出来，然后批量释放死对象
+
+
+
+~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
+
+循环引用(circular referrence)
+
+作为一种回收算法，引用计数法记录着每一个对象被其它对象所持有的引用数。如果一个对象的引用计数为零，那么该对象就变成了所谓的不可达对象，亦即可以被回收的。
+
+
+引用计数算法（reference-counting） 
+可达性算法(GC Roots Tracing):从GC Roots作为起点开始搜索，那么整个连通图中的对象便都是活对象，对于GC Roots无法到达的对象便成了垃圾回收的对象，随时可被GC回收。
+
+
+介绍自动内存管理的科普文章可能会提到引用计数（reference-counting）方式，但现在主流的JVM无一使用引用计数方式来实现Java对象的自动内存管理。
+
+基于引用计数与基于trace这两大类别的自动内存管理方式最大的不同之处在于：
+前者只需要局部信息，而后者需要全局信息。
+引用计数方式最基本的形态就是让每个被管理的对象与一个引用计数器关联在一起，该计数器记录着该对象当前被引用的次数，
+每当创建一个新的引用指向该对象时其计数器就加1，每当指向该对象的引用失效时计数器就减1。当该计数器的值降到0就认为对象死亡。
+
+每个计数器只记录了其对应对象的局部信息——被引用的次数，而没有（也不需要）一份全局的对象图的生死信息。
+
+
+Tracing GC与引用计数正好相反，需要全局的对象图信息，从对象图的“根”（也就是必然活的引用）出发扫描出去，基于引用的可到达性来判断对象的生死。这使得对象的生死状态只能批量的被识别出来，然后批量释放死对
+象。Tracing GC不显式维护对象的引用计数，只在trace的时候才能回答“有”还是“没有”活引用指向某个对象。
+
+
+实际上，在内存充裕的前提下，tracing GC的整体开销比引用计数方式更低一些，所以吞吐量（throughput）高一些。因为引用计数方式通常需要统计冗余的局部信息，而tracing GC则可以通过全局信息一口气批量判断对象的
+生死；如果是带整理的tracing GC，则其内存分配通常也会更快。不过tracing GC通常会比引用计数方式的延迟（latency）大一些，而且内存越紧张的时候tracing GC的效率反而越低，所以在内存不太充裕的地方使用引用计数
+仍然是个合理的选择（例如iOS5上的ARC）。
 
 
 
 
+~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
+1、引用计数算法//显示该对象被别的对象引用的次数
 
 
 
+-----
+引用计数法的优缺点
+
+实时性
+无需等到内存不够的时候，才开始回收，运行时根据对象的计数器是否为0，就可以直接回收。
+
+应用无需挂起
+在垃圾回收过程中，应用无需挂起。如果申请内存时，内存不足，则立刻报outofmember 错误。
+
+区域性
+更新对象的计数器时，只是影响到该对象，不会扫描全部对象
+
+缺点
+1、每次对象被引用时，都需要去更新计数器，有一点时间开销。另外无法解决循环引用问题。例如：
+
+class TestA{
+  public TestB b;
+
+}
+class TestB{
+  public TestA a;
+}
+public class Main{
+    public static void main(String[] args){
+        A a = new A();
+        B b = new B();
+        a.b=b;
+        b.a=a;
+        a = null;
+        b = null;
+    }
+}
+
+虽然a和b都为null，但是由于a和b存在循环引用，这样a和b永远都不会被回收。
+
+2、浪费cpu，即使内存够用，仍然在运行时进行计数器的统计
 
 
+~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
 
 
+2、可达性分析算法（主流算法）
 
+主流的实现中，都是通过可达性分析来判定对象是否存活。
 
+算法的基本思想：通过一系列的被称为“gc roots”的对象作为起始点，从这些节点开始向下搜索，搜索所走过的路径称为引用链，当一个对象到“gc roots”没有任何引用链相连时，则证明此对象是不可用的。
 
+可以作为“gc roots”的对象
+
+（1）虚拟机栈（栈针中的局部变量表）中引用的对象
+
+（2）方法区中类静态属性引用的对象。
+
+（3）方法区中常量引用的对象
+
+（4）本地方法栈中JNI引用的对象。
+
+如图3-1所示，对象object 5、object 6、object 7虽然互相有关联，但是它们到GC Roots是不可达的，所以它们将会被判定为是可回收的对象。
+
+-------
 
                                                         
