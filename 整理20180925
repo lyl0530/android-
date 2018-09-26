@@ -148,6 +148,36 @@ AsyncTask的底层实现也是Handler机制，AsyncTask内部会创建一个线�
 
 任务执行完后，把执行结果通过Handler发送到主线程中的onPostExecute方法中处理，并取消进度条。
 
+//若要AsyncTask串行执行，要调用execute()方法；要并行执行，则调用executeOnExecutor方法
+
+缺点
+
+若AsyncTask被声明为Activity的静态内部类，则AsyncTask内部持有了该Activity的对象
+若Activity被销毁时，AsyncTask还在后台执行，则Activity无法被回收，造成内存泄露
+
+屏幕旋转或Activity在后台被杀死后，Activity会重新创建，则AsyncTask内部持有的Activity对象已经无效，此时调用onPostExecute()方法，将无法更新UI界面
+
+
+
+------
+
+2、内存泄漏
+
+        如果AsyncTask被声明为Activity的非静态的内部类，那么AsyncTask会保留一个对创建了AsyncTask的Activity的引用。如果Activity已经被销毁，AsyncTask的后台线程还在执行，它将继续在内存里保留这个引用，导致Activity无法被回收，引起内存泄露。
+
+3、结果丢失
+
+       屏幕旋转或Activity在后台被系统杀掉等情况会导致Activity的重新创建，之前运行的AsyncTask会持有一个之前Activity的引用，这个引用已经无效，这时调用onPostExecute()再去更新界面将不再生效。
+
+4、并行还是串行
+
+      在Android 1.6之前的版本，AsyncTask是串行的，在1.6至2.3的版本，改成了并行的。在2.3之后的版本又做了修改，可以支持并行和串行，当想要串行执行时，直接执行execute()方法，如果需要并行执行，则要执行executeOnExecutor(Executor)。
+
+AsyncTask对象必须在主线程中创建
+AsyncTask对象的execute方法必须在主线程中调用
+一个AsyncTask对象只能调用一次execute方法 -- 轻量级的异步类
+
+线程池有限，太多内容同时异步会超时，甚至出现ANR效果。 
 
 -----------------------	
 
@@ -180,10 +210,19 @@ Java
 equals：比较两个对象的内容是否相等，若对象不重写equals方法，则调用object的equals方法的判断结果，返回==的判断结果
 
 
-3.
-StringBuffer StringBuilder 
-StringBuffer的方法是同步的，线程安全的。
-StringBuilder不是线程安全的，但效率比StringBuffer高。
+3.　String　StringBuffer StringBuilder 
+
+运行速度快慢为：StringBuilder > StringBuffer > String
+
+String为字符串常量，String对象一旦创建之后该对象是不可更改的，若要改变String对象内容，则会创建一个新的对象存放改变后的内容，旧对象会被回收，
+经常改变内容的字符串最好不要用 String，因为对象的创建和回收都会产生一定的开销。
+StringBuilder和StringBuffer均为字符串变量，更改字符串内容就是直接修改对象，不涉及到对象的创建和回收，速度比String快
+但StringBuffer的方法是同步的，线程安全的。
+StringBuilder不是线程安全的，运行速度比StringBuffer快，因为同步必然影响性能。若不需要考虑线程安全的情况下，建议使用StringBuilder
+
+　　String：适用于少量的字符串操作的情况
+　　StringBuffer：适用多线程下在字符缓冲区进行大量操作的情况
+　　StringBuilder：适用于单线程下在字符缓冲区进行大量操作的情况
 
 4.
 Java集合类框架//扩容->底层采用数组存储；同步必然影响性能
@@ -247,7 +286,8 @@ put和get都首先会调用hashcode方法，去查找相关的key若不重写has
 1) 属性：编译运行时，都看左边。运行时，方法有重写、覆盖，但属性无覆盖。在使用多态时，子类的属性不会覆盖父类的同名属性，此时是调用的父类的属性值。
 2) 方法：编译时看左边；运行时看右边。这也就是为什么对象p不能调用Student的study方法，因为在编译是，对象p是Person类型的。
 3) 静态成员和静态方法：无论编译和运行，都看左边。若没有向下转型，则找父类的静态成员/方法；若转型过，优先找自己的静态成员/方法；
-8. Java 内存泄漏
+
+8. Java 内存泄漏//对象被销毁，而无法被回收，引起内存泄露
 	
 	当对象存入hashset集合后，就不能再修改对象中参与计算hash值的成员了，若对应的成员被修改，则hash值改变，在删除该对象时无法根据hash值找到该对象，会造成内存泄漏
 	
