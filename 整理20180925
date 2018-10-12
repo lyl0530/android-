@@ -85,6 +85,7 @@ Application有多份
 单例模式、静态变量
 SharePreference：xml，没有实现并发修改的机制，不能保证数据的安全、准确性。
 线程同步机制失效：进程不同，锁住的对象不是同一个
+
 -----------------------	
 
 serilaziabler  parceleable
@@ -195,6 +196,63 @@ ListView如何提高其效率？
 分页加载
 利用getview的convertview参数，若该参数为空，则加载布局，并把加载好的布局缓存；若该参数不为空，则直接从缓存中取。
 使用内部类，缓存布局中的控件//避免了每次在调用getView的时候都去通过findViewById实例化数据
+
+-----------------------	
+
+@SystemApi 和@hide的不同之处 
+
+使用@hide标记的API可以不使用@SystemApi进行标,但是当使用@SystemApi标记的API则必须使用@hide
+使用@hide修饰的method/class/field，可以通过java反射机制进行访问。 
+但是使用@SystemApi修饰的method/class/field，无法通过java 反射机制进行访问(会触发invocationTargetException异常)
+
+-----------------------	
+
+Android系统的进程分类
+
+1、前台进程：正在前台运行的进程：正在和用户交互的Activity
+2、可见进程：一般还是显示在屏幕中，但是用户并没有直接与之进行交互。比如前台 Activity 启动了一个对话框。
+3、服务进程：使用 startService() 方法启动的服务，后台执行任务的进程。
+4、后台进程：Activity对用户不可见，即调用 Activity的onStop()方法的进程
+5、空进程：不包含任何应用组件的进程
+
+-----------------------	
+
+据我所知android提供了以下几种方法，用于实现后台线程与UI线程的交互。
+1、handler
+2、Activity.runOnUIThread(Runnable)
+3、View.Post(Runnable)
+4、View.PostDelayed(Runnabe,long)
+5、AsyncTask
+
+1、runOnUIThread,用法如下。
+     Activity.this.runOnUiThread(new Runnable{
+          @Overid
+           public void run(){
+                ..........这里所有的代码都是运行在UI线程
+           }
+    })
+    或者写法如下：
+    class xx implements Runnable{
+            public xx(){
+            }
+            ........
+            @Overid
+            public void run(){
+               ............这里所有的代码都是运行在UI线程
+            }
+     }
+    Activity.this.runOnUiThread(new xx());
+
+
+
+java中创建线程的四种方法以及区别
+Java使用Thread类代表线程，所有的线程对象都必须是Thread类或其子类的实例。
+Java可以用如下方式来创建线程
+1）继承Thread类创建线程
+2）实现Runnable接口创建线程
+3）使用Callable和Future创建线程
+4）使用线程池例如用Executor框架
+
 
 -----------------------	
 
@@ -312,5 +370,330 @@ put和get都首先会调用hashcode方法，去查找相关的key若不重写has
 mygithubcode0*#
 
 
+---------------
 
+
+
+
+
+1 View和ViewGroup的关系：
+
+ViewGroup作为布局容器类的最上层，布局容器里面又可以有View和ViewGroup。
+
+
+ViewGroup是View的子类，一个ViewGroup可包含多个ViewGroup和View
+ViewGroup实现了ViewManager接口，里边有个addView方法，可添加View
+
+View内容绘制，所有控件都是继承自View，ImageView，Textview，Button，ProgressBar等
+ViewGroup控制布局，所有布局都是继承自ViewGroup，LinearLayout，Framelayout，ListView等
+
+-------
+
+2 View的生命周期
+创建对象、测量、布局、绘制、事件处理、死亡
+
+-------
+
+3.创建对象
+
+-------
+
+4 测量　onMeasure()
+子类可以覆写onMeasure()方法实现自己的计算视图大小的方式，并通过setMeasuredDimension(width, height)保存计算结果；
+ 只有这个方法调用了, 我们才能调用getMeasuredWidth()或者getMeasuredHeight()方法获得测量宽高(注意, 不是实际宽高, 实际宽高要在布局完成之后)。
+ 
+-------
+
+5 布局　onLayout
+
+在布局完成后, 我们才能调用getWidth()和getHeight获得实际的宽高.
+
+getWidth()和getMeasuredWidth()的区别: getMeasureWidth()方法在measure()过程结束后就可以获取到了，而getWidth()方法要在layout()过程结束后才能获取到。
+另外，getMeasureWidth()方法中的值是通过setMeasuredDimension()方法来进行设置的，而getWidth()方法中的值则是通过视图右边的坐标减去左边的坐标计算出来的。
+
+自定义view要重写onDraw方法，但自定义viewGroup要重写onLayout方法，布局发生改变时会调用onLayout方法
+
+-------
+
+6 绘制　onDraw
+
+View的重新绘制: invalidate / postInvalidate
+
+二者都会触发view的重绘，调用onDraw方法；
+前者是在主线程调用，后者在主线程子线程都可调用  
+从重绘效率上讲：invalidate()较高
+
+
+---------------------
+
+View的draw//view的绘制分为四个步骤:
+
+绘制视图的背景
+绘制视图的内容。在onDraw(canvas)方法中完成 
+绘制当前视图的子视图，调用dispatchDraw
+绘制滚动条等装饰
+
+绘制需要两个类, 画布(Canvas)和画笔(Paint)
+
+-------
+
+
+
+protected void onDraw(Canvas canvas)：
+View类中用于重绘的方法，这个方法是所有View、ViewGroup及其派生类都具有的方法，也是Android UI绘制最重要的方法。开发者可重载该方法，并在重载的方法内部基于参数canvas绘制自己的各种图形、图像效果。
+
+protected void onLayout(boolean changed, int left, int top, int right, int bottom)：
+View类中布局发生改变时会调用的方法，这个方法是所有View、ViewGroup及其派生类都具有的方法，重载该类可以在布局发生改变时作定制处理，这在实现一些特效时非常有用。
+
+protected void dispatchDraw(Canvas canvas)：
+ViewGroup类及其派生类具有的方法，这个方法主要用于控制子View的绘制分发，重载该方法可改变子View的绘制，进而实现一些复杂的视效，典型的例子可参见Launcher模块Workspace的dispatchDraw重载。
+
+protected boolean drawChild(Canvas canvas, View child, long drawingTime))：
+ViewGroup类及其派生类具有的方法，这个方法直接控制绘制某局具体的子view，重载该方法可控制具体某个具体子View
+
+-------
+
+
+如何把自定义控件的原理落实到代码上
+步骤
+1)
+自定义属性的声明与获取分析需要的自定义属性；
+在res/values/attrs.xml中进行声明；
+在Layout.xml文件中进行使用在View的构造方法中获得我们自定义的属性/声明的属性；
+TypedArray 获取所有的自定义属性的集合，然后进行遍历；
+
+2)测量onMeasure()测量模式和测量值，有三种测量模式EXACTLY：一般是设置了明确的值或者是MATCH_PARENTAT_MOST：表示子布局限制在一个最大值内，一般为WARP_CONTENTUNSPECIFIED：表示子布局想要多大就多大，ListView  ScrollViewMeasureSPEC主要用于计算视图的大小，即视图的宽度和长度；子类可以覆写onMeasure()方法实现自己的计算视图大小的方式，并通过setMeasuredDimension(width, height)保存计算结果；
+3)布局onLayout() 自定义ViewGroup才有的方法，继承自VierGroup，自定义View没有的；编写继承自View/VierGroup的子类（TextView、LinearLayout等）用于控制控件在屏幕中显示的位置；
+4)绘制onDraw()  调用Canvas里面的api进行绘制操作；draw操作利用前两部得到的参数，将视图显示在屏幕上；
+5)onTouchEvent()触摸事件的实现,响应用户操作。
+6)onInterceptTouchEvent()
+事件分发和拦截，只有自定义ViewGroup才有的方法；
+在布局文件中使用时，使用全类名；
+
+
+--------------------
+　
+　
+　网络技术 随笔：	针对的都是Client
+
+1 发送HTTP请求 	：	开启子线程发送网络请求
+2 接收返回的网络数据
+3 解析、处理这些数据：	若要更新UI元素，要调用runOnUIThread（），切换到主线程，再更新UI。
+4 权限：android.permission.INTERNET
+
+1 两种访问网络的方式：
+	HttpURLConnection
+	okHttp 开源的网络通信库
+
+1.1 HttpURLConnection
+	获取HttpURLConnection实例connection ：new URL(addr) --> openConnection()
+		setRequestMethod() 	//GET[从Server获取数据] POST[提交数据至Server]
+		setConnectTimeout()	//连接超时
+		setReadTimeout()	//读取超时
+		getInputStream()	//获取Server返回的输入流
+		disconnect()		//关闭HTTP连接
+
+1.2 okHttp
+	添加依赖：compile 'com.squareup.okhttp3:okhttp:3.4.1'
+	创建OkHttpClient实例client ：new OkHttpClient()
+		newCall(request).exectue();			//创建Call对象，并调用其exectue()方法
+			new Request.Builer().url().build();	//创建Request对象
+
+2 传输数据常用的格式 ：XML JSON
+xml语义性好，易于理解，但体积大
+json体积小，易于传输，但语义性差
+
+
+2.1 解析XML格式数据：Pull、SAX解析方式
+
+2.1.1 Pull解析XML格式的数据
+	获取XmlPullParserFactory实例 factory：XmlPullParserFactory.newInstance();
+	获取XmlPullParser实例 xmlPullParser : factory.newPullParser();
+		setInput() //把Server返回的数据设置进去，开始解析
+		getEventType()//当前解析事件，是否结束 XmlPullParser.END_DOCUMENT
+		next()//下一解析事件
+		getName()//节点名
+		nextText()//节点内容
+
+2.1.2 SAX解析XML格式的数据
+		DefaultHandler
+
+2.2 解析JSON格式数据：JSONObject、GSON解析方式		
+
+2.2.1 JSONObject解析JSON格式的数据
+      若JSON格式的数据是个JSON数组，则要把该数据传入JSONArray对象中，遍历JSONArray，得到的每个元素是JSONObject对象:JSONArray   -->   JSONObject
+	new JASONArray()//解析json数组
+		getJSONObject//解析json元素。若json数据中，有多个数组嵌套，要先获取json元素，再得到其json数组，层层解析。
+	
+2.2.1 GSON解析JSON格式的数据
+	添加依赖 compile 'com.gogle.code.gson:gson:2.7'
+	new Gson()
+		fromJson
+    
+//
+     fromJson()方法用于将JSON数据转换为相应的Java对象，主要有以下几种形式：
+
+　　（1）<T> T fromJson(JsonElement json, Class<T> classOfT);
+
+　　（2）<T> T fromJson(JsonElement json, Type typeOfT);
+
+　　（3）<T> T fromJson(JsonReader reader, Type typeOfT);
+
+　　（4）<T> T fromJson(Reader reader, Class<T> classOfT);
+
+　　（5）<T> T fromJson(Reader reader, Type typeOfT);
+
+　　（6）<T> T fromJson(String json, Class<T> classOfT);
+
+　　（7）<T> T fromJson(String json, Type typeOfT);
+
+　　 以上的方法用于将不同形式的JSON数据解析成Java对象。
+
+//
+     new TypeToken<List<Person>>(){}.getType()是怎么获取到泛型参数类型的呢
+首先，new TypeToken<List<Person>>(){}是一个匿名内部类，其等价
+MyTypeToken<List<Person>> extends TypeToken(){}，
+
+但是{}里是空的，既然什么都没有改变，为什么还要这么用呢？下面看源码
+
+进一步，TypeToken源码如下：
+public class TypeToken<T> {
+    final Class<? super T> rawType;
+    final Type type;
+    final int hashCode;
+
+//这里的空参构造方法权限修饰符是protected,那木只有其子类可访问，预示着要使用子类构造。
+    protected TypeToken() {
+        this.type = getSuperclassTypeParameter(this.getClass());//这里传入的子类，后面2行不用看
+        this.rawType = Types.getRawType(this.type);
+        this.hashCode = this.type.hashCode();
+    }
+
+   ...
+
+    static Type getSuperclassTypeParameter(Class<?> subclass) {
+        Type superclass = subclass.getGenericSuperclass();//获取到子类的父类Type
+        if(superclass instanceof Class) {
+            throw new RuntimeException("Missing type parameter.");
+        } else {
+            ParameterizedType parameterized = (ParameterizedType)superclass;//将Type类型向下转型为参数化类型ParameterizedType
+            return Types.canonicalize(parameterized.getActualTypeArguments()[0]);//这里getActualTypeArguments()返回的是一个数组，由于只有一个泛型参数,直接[0]。
+        }
+    }
+
+若是还不是太明白，那就是Java这块的东西还不熟。上面的原码部分牵涉到Java的知识点：
+
+Type：其是一个接口java.lang.reflect.Type，主要有5类：
+raw types：一般类型，例如：String，Collections ，Math，Number…
+parameterized types ： 参数化类型，例如：List<String>集合中常用…
+array types ： 数组类型
+type variables ：类型变量，不确定其类型，例如List<? extends Person>
+primitive types : 基本类型，int，float…
+
+详细参见：http://blog.csdn.net/kaka123ac/article/details/4470813
+
+getSuperClass() 与 getGenericSuperclass()区别：
+
+前者，返回表示此 Class 所表示的实体（类、接口、基本类型或 void）的超类的 Class（由于编译擦除，没有显示泛型参数：在运行期间，泛型参数类型一律为Object类型）。
+后者，返回表示此 Class 所表示的实体（类、接口、基本类型或 void）的直接超类的 Type（包含泛型参数）。
+
+详细参见： http://www.cnblogs.com/maokun/p/6773203.html
+
+GSON源码中Types.canonicalize方法，将Java 中的Type实现，转化为自己内部的数据实现，想要继续探讨，可以去看源码或者参见：https://my.oschina.net/u/874727/blog/750473
+
+最后，我们来实践一下，实现Java中如何获取参数类型，TypeToken内部就是Java实现，然后转换。直接上代码：
+
+public class TypeToken1<String> {
+
+    public TypeToken1() {
+    }
+    //为了测试，这个类什么都不干，手动去获取参数类型String
+}
+
+----------
+
+public class TypeTokenTest {
+    public static void main(String[] args){
+
+        Type mySuperClass = new TypeToken1<String>(){}.getClass().getGenericSuperclass();
+        Type type = ((ParameterizedType) mySuperClass).getActualTypeArguments()[0];
+        System.out.println("获得的泛型参数:"+type);
+
+    }
+}
+
+
+运行结果:
+
+获得的泛型参数:class java.lang.String
+    
+
+
+
+
+		if( null == packageName 
+			|| "com.android.settings".equals(packageName)
+			|| "com.android.inputmethod.latin".equals(packageName) ){
+			debug("packageName = " + packageName);
+			return;
+		}
+		
+		
+		
+	1 handle的使用与原理
+	
+    2 线程切换与线程池的种类与作用，什么情况下使用多线程，有什么好处
+    
+    
+    3 简单介绍四大组件
+    a:展示型组件
+    s:后台计算型组件
+    b:消息型组件，
+    c:数据共享型组件，不同应用可共享数据，供其他应用使用，
+    
+    4 Manfest.xml的里有什么和作用
+    
+    manifest：包名	
+	    权限声明
+    	application：应用图标、名字
+			默认启动的Activity
+			 <intent-filter>
+		        <action android:name="android.intent.action.MAIN"/>
+		        <category android:name="android.intent.category.LAUNCHER"/>
+		    </intent-filter>
+			其他组件的声明
+		
+	
+	
+    什么是多进程，进程和线程的区别，如何给四大组件指定多进程。
+    一个应用启动，就是一个进程，该应用的所有组件默认运行在该进程中，应用的包名就是进程名
+    进程是一种可执行单元，每一个进程都要自己独立的空间，不同进程不能任意访问，多进程要。
+    
+    线程是ｃｕｐ调动的基本单位，里边可有多个线程，也可只有一个线程，主线程
+    线程的创建、销毁都会有一定的开销，为避免这种开销，使用线程池，缓存一定数量的线程    
+    
+    多进程之间的通信的方式，如何使用AIDL。他的使用场景是什么。
+
+    View的加载流程
+    
+    
+    如何实现一个自定义View
+    如何选择第三方，从那些方面考虑
+    内存优化
+    bitmap的三级缓存思想与如何优化bitmap
+    注解的作用与原理
+    设计一个音乐播放界面，你会如何实现，用到那些类，如何设计，如何定义接口，如何与后台交互，如何缓存与下载，如何优化(15分钟时间)
+
+
+下面是公司负责人面试
+
+    什么是hash，他的作用是什么。hashMap源码是什么，他是依据什么原理实现的。
+    就是用于表示事物特征的一串特征码
+    比如验证、加密等都可以用到Hash。
+    
+    手写一段代码，如何找出一段字符串中，出现最多的汉字是哪个。
+
+第一场面试的时候大约2.5小时，第二场40-1小时，共3.5小时左右，因为当天的面试安排特别多，所以早点去，而且离家近，去了等他们还没有上班，走的时候他们午饭已经吃完了。其实前一个面试官聊得很不错，一般聊到总负责人就不会在技术了。而且他们要的是实习生，当时我也不知道怎么就去了。后面关于数据结构原理与算法，我基本完败，我不知道1-2年的Android能理解到什么程度只能说我技不如人，走的时候给我留个作业，设计一个基于高德地图的车载功能，要求界面流程，路线图实时绘制，定位准确。2天时间。
+
+。
 
